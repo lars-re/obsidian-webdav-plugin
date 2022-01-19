@@ -1,6 +1,6 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-underscore-dangle */
-import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
+import { Editor, MarkdownView, Menu, Notice, Plugin } from "obsidian";
 import ImageUploader from "./uploader/ImageUploader";
 // eslint-disable-next-line import/no-cycle
 import ImgurPluginSettingsTab from "./ui/ImgurPluginSettingsTab";
@@ -197,6 +197,52 @@ export default class ImgurPlugin extends Plugin {
     this.addSettingTab(new ImgurPluginSettingsTab(this.app, this));
     this.setupImgurHandlers();
     this.setupImagesUploader();
+
+    this.registerEvent(
+      this.app.workspace.on(
+        "editor-menu",
+        (menu: Menu, editor: Editor, view: MarkdownView) => {
+          const clickable = editor.getClickableTokenAt(editor.getCursor());
+          console.log(clickable);
+          menu.addSeparator();
+          menu.addItem((item) => {
+            item
+              .setTitle("Upload to Imgur")
+              .setIcon("wand")
+              .onClick(async () => {
+                const clickable = editor.getClickableTokenAt(
+                  editor.getCursor()
+                );
+                console.log(clickable);
+
+                const lt = parseLinktext(clickable.text);
+                const file = this.app.metadataCache.getFirstLinkpathDest(
+                  lt.path,
+                  view.file.path
+                );
+
+                const arrayBuffer = await this.app.vault.readBinary(file);
+
+                const fileToUpload = new File([arrayBuffer], file.name);
+
+                // console.log(blob);
+
+                this.uploadFileAndEmbedImgurImage(fileToUpload)
+                  .then(() => view.app.vault.trash(file, true))
+                  .catch((ee) => console.log(ee));
+
+                // console.log(file);
+                // console.log(this.app.metadataCache.getFileCache(file.path));
+
+                // this.app.vault
+                //   .trash(file, true)
+                //   .then(() => {})
+                //   .catch(() => {});
+              });
+          });
+        }
+      )
+    );
   }
 
   setupImagesUploader(): void {
