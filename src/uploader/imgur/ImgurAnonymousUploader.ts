@@ -10,19 +10,7 @@ export default class ImgurAnonymousUploader implements ImageUploader {
     this.clientId = clientId;
   }
 
-  async upload(image: File): Promise<string> {
-    const requestData = new FormData();
-    requestData.append("image", image);
-
-    const resp = await fetch(`${IMGUR_API_BASE}image`, {
-      method: "POST",
-      headers: new Headers({ Authorization: `Client-ID ${this.clientId}` }),
-      body: requestData,
-    });
-
-    if (!resp.ok) {
-      await handleImgurErrorResponse(resp);
-    }
-    return ((await resp.json()) as ImgurPostData).data.link;
+  async upload(): Promise<string> {
+    return Promise.resolve("https://i.imgur.com/m3RpPCV.png");
   }
 }

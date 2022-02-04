@@ -11,6 +11,17 @@ import RemoteUploadConfirmationDialog from "./ui/RemoteUploadConfirmationDialog"
 import PasteEventCopy from "./aux-event-classes/PasteEventCopy";
 import DragEventCopy from "./aux-event-classes/DragEventCopy";
 
+// (!\[[^[\]]*\]\(https?:\/\/(?:i\.)?imgur\.com\/)(\w{8})(\.(?:png|jpe?g|gif)\))
+// (!\[[^\[\]]*\]\(https?:\/\/(?:i\.)?imgur\.com\/)(\w{7})(\.(?:png|jpe?g|gif)\))
+// ![](https://i.imgur.com/m3RpPCVl.png)![](https://i.imgur.com/m3RpPCVx.png)
+
+// ![](https://i.imgur.com/m3RpPCV.png)
+//
+// ![](https://i.imgur.com/m3RpPCV.png)
+
+const imgurImageRegexp =
+  /(\[)?(!\[[^[\]]*\]\()(https?:\/\/(?:i\.)?imgur\.com\/)(\w+)\.(png|jpe?g|gif)\)(]\(https?:\/\/(?:i\.)?imgur\.com\/\w+\.(?:png|jpe?g|gif)\))?/gm;
+
 declare module "obsidian" {
   interface MarkdownSubView {
     clipboardManager: ClipboardManager;
@@ -192,7 +203,85 @@ export default class ImgurPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  // static isMatchUnderCursor(arr: RegExpMatchArray, cursor: number): boolean {
+  //   console.log("Cursor at", cursor);
+  //   console.log("Match start at", arr.index);
+  //   console.log("Match end at", arr.index + arr[0].length);
+
+  //   return cursor > arr.index && cursor < arr.index + arr[0].length;
+  // }
+
   async onload(): Promise<void> {
+    this.addCommand({
+      id: "imgur-resize-l-command",
+      name: "Resize to Large",
+      editorCallback: (editor: Editor) => {
+        const lineNumber = editor.getCursor().line;
+        const cursorPos = editor.getCursor().ch;
+
+        const line = editor.getLine(lineNumber);
+
+        const isMatchUnderCursor = (match: RegExpMatchArray) =>
+          cursorPos > match.index && cursorPos < match.index + match[0].length;
+
+        const matchUnderCursor: RegExpMatchArray = Array.from(
+          line.matchAll(imgurImageRegexp)
+        ).find((match) => isMatchUnderCursor(match));
+
+        if (!matchUnderCursor) {
+          // eslint-disable-next-line no-new
+          new Notice("No Imgur image under cursor");
+          return;
+        }
+
+        const potentialImageId = matchUnderCursor[4];
+
+        if (potentialImageId.length !== 7 && potentialImageId.length !== 8) {
+          // eslint-disable-next-line no-new
+          new Notice(
+            `Existing image id '${potentialImageId}' is of unexpected size. Abodring...`
+          );
+          return;
+        }
+
+        const imageId = potentialImageId.substring(0, 7);
+
+        const prefix = matchUnderCursor[3];
+        const ext = matchUnderCursor[5];
+
+        let replacement = `${matchUnderCursor[2]}${prefix}${imageId}l.${ext})`;
+
+        console.log(matchUnderCursor);
+
+        if (matchUnderCursor[1] && matchUnderCursor[6]) {
+          replacement = `${matchUnderCursor[1]}${replacement}${matchUnderCursor[6]}`;
+        } else {
+          replacement = `[${replacement}](${prefix}${imageId}.${ext})`;
+        }
+
+        editor.replaceRange(
+          replacement,
+          { line: lineNumber, ch: matchUnderCursor.index },
+          {
+            line: lineNumber,
+            ch: matchUnderCursor.index + matchUnderCursor[0].length,
+          }
+        );
+
+        // console.log(line.matchAll(imgurImageRegexp));
+
+        // if (match.groups)
+        // console.log(editor.getValue());
+        // console.log(editor.getClickableTokenAt(editor.getCursor()));
+
+        // console.log(line);
+
+        // const clickable = editor.getClickableTokenAt(editor.getCursor());
+        // console.log(clickable);
+
+        // const lt = parseLinktext(clickable.text);
+      },
+    });
     await this.loadSettings();
     this.addSettingTab(new ImgurPluginSettingsTab(this.app, this));
     this.setupImgurHandlers();
